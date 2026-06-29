@@ -1,0 +1,1292 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SharePoint Intranet – One Page Scroll</title>
+  <style>
+    :root{
+      --bg:#0b0e14;
+      --text:#e9eef7;
+      --muted:rgba(233,238,247,.78);
+      --glassA: rgba(255,255,255,.12);
+      --glassB: rgba(255,255,255,.06);
+      --glassBorder: rgba(255,255,255,.22);
+      --glassBorderOn: rgba(255,255,255,.42);
+      --glassGlow: rgba(255,255,255,.18);
+      --safeX: clamp(18px, 3.2vw, 48px);
+      --sectionGap: clamp(30px, 5vw, 70px);
+      --navHeight: 88px;
+      --fadeEase: cubic-bezier(.2,.8,.2,1);
+      --themeHue: rgba(0,0,0,0);
+      --themeHueOpacity: 0;
+    }
+
+    *{box-sizing:border-box}
+    html, body{
+      margin:0;
+      height:100%;
+      scroll-behavior:auto;
+    }
+    body{
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      color:var(--text);
+      background:var(--bg);
+      overflow:hidden;
+    }
+
+    .portal-shell{
+      isolation:auto;
+      height:100vh;
+      width:100%;
+      overflow-y:auto;
+      overflow-x:hidden;
+      position:relative;
+      background:transparent;
+      -webkit-overflow-scrolling:touch;
+    }
+
+    .bg-layer{
+      position:fixed; inset:0;
+      z-index:-4;
+      background:#000 center/cover no-repeat;
+      opacity:0;
+      transition: opacity .16s linear;
+      filter:none;
+      transform:none;
+      overflow:hidden;
+    }
+    .bg-layer::before,
+    .bg-layer::after{display:none;}
+    .bg-layer::before{display:none;}
+    .bg-layer::after{display:none;}
+    .bg-layer.active{opacity:.99}
+    .bg-layer{background-attachment:scroll;}
+    .bg{position:fixed; inset:0; z-index:-3; background:rgba(0,0,0,.42)}
+    .themeHue{position:fixed; inset:0; z-index:-2; pointer-events:none; background:var(--themeHue); mix-blend-mode:color; opacity:var(--themeHueOpacity); transition:opacity .24s var(--fadeEase),background .24s var(--fadeEase)}
+    .vignette{position:fixed; inset:0; z-index:-1; pointer-events:none; background:radial-gradient(circle at 55% 35%, rgba(0,0,0,0) 0, rgba(0,0,0,.28) 58%, rgba(0,0,0,.8) 100%)}
+
+    @keyframes bgBloomDrift{
+      0%{ transform: translate3d(-1.2%, -0.8%, 0) scale(1.02); opacity:.28; }
+      50%{ transform: translate3d(1.0%, -1.1%, 0) scale(1.06); opacity:.40; }
+      100%{ transform: translate3d(0.6%, 1.0%, 0) scale(1.04); opacity:.34; }
+    }
+    @keyframes bgGrainShift{
+      0%{ transform: translate3d(0,0,0); }
+      25%{ transform: translate3d(-0.8%, 0.5%, 0); }
+      50%{ transform: translate3d(0.6%, -0.4%, 0); }
+      75%{ transform: translate3d(-0.4%, -0.6%, 0); }
+      100%{ transform: translate3d(0.8%, 0.4%, 0); }
+    }
+
+    .scrollNav{
+      position:fixed;
+      left:50%;
+      transform:translateX(-50%);
+      top:16px;
+      display:flex;
+      gap:20px;
+      align-items:center;
+      justify-content:center;
+      padding:12px 18px;
+      border-radius:999px;
+      background:rgba(0,0,0,.42);
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow:0 10px 28px rgba(0,0,0,.30);
+      backdrop-filter: blur(10px) saturate(1.08);
+      -webkit-backdrop-filter: blur(10px) saturate(1.08);
+      z-index:1000;
+      flex-wrap:wrap;
+    }
+    .scrollNavBtn{
+      position:relative;
+      background:transparent;
+      border:0;
+      color:rgba(255,255,255,.88);
+      font-weight:700;
+      font-size:14px;
+      letter-spacing:.2px;
+      padding:8px 10px;
+      cursor:pointer;
+      text-shadow:0 3px 10px rgba(0,0,0,.85);
+    }
+    .scrollNavBtn.active{color:#fff}
+    .scrollNavBtn.active::after{
+      content:"";
+      position:absolute;
+      left:10px; right:10px; bottom:2px;
+      height:2px; border-radius:999px;
+      background:rgba(255,255,255,.9);
+      box-shadow:0 0 18px rgba(255,255,255,.2);
+    }
+
+    .topbar{
+      position:fixed;
+      top:18px;
+      right:var(--safeX);
+      z-index:1100;
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+    .editName{opacity:.72;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);margin-left:10px;vertical-align:middle}
+    .themeBtn{height:40px;padding:0 14px;border-radius:14px;border:1px solid rgba(255,255,255,.22);background:linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.06));color:var(--text);font-weight:780;cursor:pointer;box-shadow:0 14px 34px rgba(0,0,0,.22);backdrop-filter: blur(14px) saturate(1.25);-webkit-backdrop-filter: blur(14px) saturate(1.25)}
+    .themeWrap{position:relative}
+    .themeMenu{position:absolute;top:calc(100% + 10px);right:0;display:none;gap:10px;padding:10px 12px;border-radius:18px;border:1px solid rgba(255,255,255,.20);background:linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06));box-shadow:0 22px 70px rgba(0,0,0,.42);backdrop-filter: blur(10px) saturate(1.10);-webkit-backdrop-filter: blur(18px) saturate(1.25)}
+    .themeMenu.open{display:flex}
+    .themeSwatch{width:18px;height:18px;border-radius:999px;border:2px solid rgba(255,255,255,.35);cursor:pointer;padding:0;box-shadow:0 10px 24px rgba(0,0,0,.35)}
+    .themeSwatch[data-theme="white"]{ background:#ffffff; }
+    .themeSwatch[data-theme="grey"]{ background:#aeb6c2; }
+    .themeSwatch[data-theme="black"]{ background:#0b0e14; }
+    .themeSwatch[data-theme="blue"]{ background:#2b7cff; }
+    .themeSwatch[data-theme="red"]{ background:#ff3b5c; }
+    .themeSwatch[data-theme="purple"]{ background:#8b5cff; }
+    .themeSwatch[data-theme="green"]{ background:#20e3a2; }
+    .themeSwatch[data-theme="yellow"]{ background:#ffd24a; }
+
+    main{padding:28px var(--safeX) 80px;overflow:visible;min-height:max-content}
+
+    .section{
+      min-height:auto;
+      padding:30px 0 40px;
+      display:flex;
+      flex-direction:column;
+      justify-content:flex-start;
+      gap:26px;
+      scroll-margin-top:24px;
+    }
+    .section + .section{margin-top:var(--sectionGap)}
+
+    .sectionNav{
+      display:flex;
+      justify-content:center;
+      flex-wrap:wrap;
+      gap:20px;
+      padding-top:8px;
+    }
+    .tilewrap{display:flex;flex-direction:column;align-items:center;min-width:0}
+    .tile{
+      position:relative;
+      width:112px;
+      height:112px;
+      border-radius:26px;
+      border:1px solid var(--glassBorder);
+      background:linear-gradient(180deg, var(--glassA), var(--glassB));
+      box-shadow:0 10px 24px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.08);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      color:inherit;
+      text-decoration:none;
+      transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease, filter .18s ease;
+      backdrop-filter: blur(10px) saturate(1.10);
+      -webkit-backdrop-filter: blur(10px) saturate(1.10);
+    }
+    .tile svg{width:48px;height:48px;opacity:.92}
+    .tile:hover, .tile.is-current{transform:translateY(-2px) scale(1.02);border-color:var(--glassBorderOn);box-shadow:0 22px 55px rgba(0,0,0,.35), 0 0 22px var(--glassGlow), inset 0 1px 0 rgba(255,255,255,.14)}
+    .tile-label{margin-top:12px;font-size:18px;font-weight:700;text-align:center;text-shadow:0 2px 10px rgba(0,0,0,.35)}
+
+    .sectionHead{text-align:center;max-width:1000px;margin:0 auto}
+    .userGreeting{font-size:clamp(18px,1.8vw,28px);font-weight:760;line-height:1.2;margin:0 0 8px;text-shadow:0 8px 24px rgba(0,0,0,.42)}
+    .userGreeting .editName{transform:translateY(-1px)}
+    .eyebrow{font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:rgba(233,238,247,.66);margin-bottom:10px}
+    .title{font-size:clamp(30px,4vw,54px);line-height:1.05;font-weight:800;text-shadow:0 10px 24px rgba(0,0,0,.45);margin:0 0 12px}
+    .lead{font-size:clamp(14px,1.35vw,18px);line-height:1.55;color:rgba(233,238,247,.88);max-width:920px;margin:0 auto}
+
+    .homeCards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;max-width:1150px;margin:0 auto;width:100%}
+    .guideCard,.glassPanel,.subtile{
+      border-radius:22px;
+      border:1px solid rgba(255,255,255,.18);
+      background:linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06));
+      box-shadow:0 10px 24px rgba(0,0,0,.22);
+      backdrop-filter: blur(10px) saturate(1.10);
+      -webkit-backdrop-filter: blur(10px) saturate(1.10);
+    }
+    .guideCard{padding:16px}
+    .guideCard .t{font-weight:800;font-size:18px;margin-bottom:8px}
+    .guideCard .d{font-size:14px;line-height:1.5;color:var(--muted)}
+
+    .socialBlock{display:flex;flex-direction:column;align-items:center;gap:18px}
+    .socialIcons{display:flex;justify-content:center;gap:22px;flex-wrap:wrap}
+    .socialBtn{display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:999px;background:rgba(12,16,24,.32);border:1px solid rgba(255,255,255,.12);box-shadow:0 14px 28px rgba(0,0,0,.35);transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease}
+    .socialBtn:hover{transform:translateY(-2px) scale(1.02);border-color:rgba(255,255,255,.22);box-shadow:0 0 0 1px rgba(255,255,255,.16), 0 18px 40px rgba(0,0,0,.42), 0 0 18px rgba(255,255,255,.22)}
+    .socialBtn img{width:42px;height:42px;opacity:.92}
+
+    .gridDepartments{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;width:min(1400px,100%);margin:0 auto}
+    .gridResources{display:grid;grid-template-columns:repeat(2,minmax(0,420px));justify-content:center;gap:20px;width:min(900px,100%);margin:0 auto}
+    .gridTools{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,140px));justify-content:center;gap:18px;width:min(900px,100%);margin:0 auto;padding-top:10px}
+
+    .subtile{display:flex;flex-direction:column;color:var(--text);text-decoration:none;overflow:hidden;position:relative}
+    .deptTile{aspect-ratio:16/9;justify-content:flex-end;padding:16px;isolation:isolate}
+    .deptTile .deptImg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top center;transform:scale(1.01);transition:transform .6s cubic-bezier(.2,.8,.2,1), filter .6s cubic-bezier(.2,.8,.2,1);z-index:1}
+    .deptTile .deptTitle{position:relative;z-index:2;font-size:18px;font-weight:850;letter-spacing:.2px;text-shadow:0 3px 10px rgba(0,0,0,.95)}
+    .deptTile:hover{transform:translateY(-4px);border-color:rgba(255,255,255,.45);box-shadow:0 20px 55px rgba(0,0,0,.45),0 0 16px rgba(255,255,255,.18)}
+    .deptTile:hover .deptImg{transform:scale(1.1);filter:saturate(1.1) contrast(1.04) brightness(1.02)}
+    .deptTile::after{content:"";position:absolute;inset:0;background:linear-gradient(to top, rgba(0,0,0,.58), rgba(0,0,0,.10) 55%, rgba(0,0,0,0));z-index:1}
+
+    .toolCircle{
+      width:100%;
+      aspect-ratio:1/1;
+      border-radius:999px;
+      align-items:center;
+      justify-content:center;
+      padding:0;
+      background-size:contain;
+      background-position:center;
+      background-repeat:no-repeat;
+      background-color:rgba(255,255,255,.03);
+      border:1px solid rgba(255,255,255,.14);
+      box-shadow:0 8px 20px rgba(0,0,0,.24);
+      position:relative;
+      overflow:visible;
+    }
+    .toolCircle::after{content:"";position:absolute;inset:0;border-radius:999px;background:radial-gradient(circle at 30% 25%, rgba(255,255,255,.12), rgba(255,255,255,0) 55%),linear-gradient(to bottom, rgba(0,0,0,.05), rgba(0,0,0,.18));pointer-events:none}
+    .toolCircle:hover{transform:scale(1.08);border-color:rgba(255,255,255,.45);box-shadow:0 18px 50px rgba(0,0,0,.45),0 0 18px rgba(255,255,255,.22)}
+    .toolLabel{position:absolute;left:50%;top:calc(100% + 10px);transform:translateX(-50%);width:180px;text-align:center;font-size:13px;font-weight:720;color:rgba(245,248,255,.92);text-shadow:0 8px 22px rgba(0,0,0,.6);pointer-events:none}
+
+    .resourceCard{height:220px;padding:0;justify-content:flex-end}
+    .resourceCard .deptTitle{position:relative;z-index:2;font-size:18px;line-height:1.12;font-weight:850;padding:0 18px 16px;margin:0;white-space:normal;word-break:keep-all;text-shadow:0 3px 10px rgba(0,0,0,.98)}
+
+    .deptTile.hasChildren{cursor:pointer}
+    .deptTile.hasChildren .deptTitle::after{content:'+';display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin-left:10px;border-radius:999px;background:rgba(0,0,0,.38);border:1px solid rgba(255,255,255,.18);font-size:16px;font-weight:800;vertical-align:middle}
+
+    .childModal{position:fixed;inset:0;z-index:1300;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(3,7,14,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);opacity:0;pointer-events:none;transition:opacity .24s ease}
+    .childModal.open{opacity:1;pointer-events:auto}
+    .childModalCard{width:min(720px,calc(100vw - 32px));border-radius:26px;border:1px solid rgba(255,255,255,.22);background:linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.08));box-shadow:0 28px 90px rgba(0,0,0,.5);padding:22px;backdrop-filter:blur(20px) saturate(1.15);-webkit-backdrop-filter:blur(20px) saturate(1.15)}
+    .childModalTop{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+    .childModalTitle{font-size:28px;font-weight:860;line-height:1.05}
+    .childModalSub{margin-top:6px;color:var(--muted);font-size:14px}
+    .childModalClose{width:42px;height:42px;border-radius:14px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:var(--text);font-size:22px;font-weight:700;cursor:pointer}
+    .childModalGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+    .childModalLink{display:flex;align-items:center;justify-content:center;min-height:120px;padding:18px;border-radius:22px;border:1px solid rgba(255,255,255,.18);background:linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06));color:var(--text);text-decoration:none;font-size:18px;font-weight:780;text-align:center;box-shadow:0 18px 40px rgba(0,0,0,.28);transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease}
+    .childModalLink:hover{transform:translateY(-4px);border-color:rgba(255,255,255,.42);box-shadow:0 24px 55px rgba(0,0,0,.38),0 0 18px rgba(255,255,255,.16)}
+
+
+    .resourceCard.is-new{position:relative;overflow:hidden}
+    .newBanner{
+      position:absolute;
+      top:12px;
+      right:12px;
+      z-index:4;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-width:52px;
+      height:28px;
+      background:linear-gradient(180deg, #ff5a6b, #e23145);
+      color:#fff;
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      padding:0 12px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.28);
+      box-shadow:0 14px 28px rgba(226,49,69,.35), 0 6px 18px rgba(0,0,0,.35);
+      text-shadow:0 2px 6px rgba(0,0,0,.35);
+      pointer-events:none;
+      animation:newPulse 1.8s ease-in-out infinite;
+    }
+    @keyframes newPulse{
+      0%,100%{ transform:scale(1); }
+      50%{ transform:scale(1.06); }
+    }
+
+    .childModalGrid.hasImages{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
+    .childModalLink.hasImage{
+      position:relative;
+      min-height:170px;
+      padding:0;
+      overflow:hidden;
+      align-items:flex-end;
+      justify-content:flex-start;
+      border-radius:24px;
+      box-shadow:0 18px 40px rgba(0,0,0,.30);
+      transform:translateY(0) scale(1);
+    }
+    .childModalLink.hasImage:hover{
+      transform:translateY(-6px) scale(1.05);
+      border-color:rgba(255,255,255,.46);
+      box-shadow:0 28px 60px rgba(0,0,0,.42),0 0 20px rgba(255,255,255,.16);
+    }
+    .childModalLinkImg{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      transform:scale(1.02);
+      transition:transform .35s ease, filter .35s ease;
+    }
+    .childModalLink.hasImage:hover .childModalLinkImg{
+      transform:scale(1.08);
+      filter:saturate(1.06) contrast(1.04) brightness(1.03);
+    }
+    .childModalLinkLabel{
+      position:relative;
+      z-index:2;
+      width:100%;
+      padding:18px 16px;
+      background:linear-gradient(to top, rgba(0,0,0,.72), rgba(0,0,0,.18) 72%, rgba(0,0,0,0));
+      text-align:left;
+      font-size:18px;
+      font-weight:820;
+      text-shadow:0 3px 12px rgba(0,0,0,.92);
+    }
+
+    .lukeCredit{position:sticky; margin-left:auto; width:max-content; right:auto; bottom:auto; top:calc(100vh - 40px);z-index:900;font-size:11px;letter-spacing:.25px;text-transform:uppercase;color:rgba(233,238,247,.65);text-shadow:0 4px 14px rgba(0,0,0,.45)}
+
+    .welcomeOverlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;z-index:1200;background:radial-gradient(circle at 50% 35%, rgba(255,255,255,.06) 0%, rgba(0,0,0,.58) 55%, rgba(0,0,0,.82) 100%);opacity:0;pointer-events:none;transition:opacity 520ms var(--fadeEase)}
+    .welcomeOverlay.show{opacity:1;pointer-events:auto}
+    .welcomeCard{width:min(560px,100%);border-radius:22px;border:1px solid rgba(255,255,255,.22);background:linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06));box-shadow:0 30px 90px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.10);padding:22px 22px 18px;backdrop-filter: blur(10px) saturate(1.10);-webkit-backdrop-filter: blur(18px) saturate(1.25)}
+    .welcomeTitle{font-size:34px;font-weight:860;margin-bottom:6px;text-shadow:0 10px 30px rgba(0,0,0,.45)}
+    .welcomeSub{color:rgba(233,238,247,.78);font-size:14px;line-height:1.35;margin-bottom:16px}
+    .welcomeForm{display:flex;gap:10px;align-items:center}
+    .welcomeInput{flex:1 1 auto;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,.22);background:rgba(0,0,0,.18);color:var(--text);padding:0 14px;font-size:15px;outline:none}
+    .welcomeBtn{height:44px;padding:0 16px;border-radius:14px;border:1px solid rgba(255,255,255,.24);background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.08));color:var(--text);font-weight:780;cursor:pointer}
+    body.hasWelcome main, body.hasWelcome .topbar, body.hasWelcome .scrollNav{filter:blur(10px) saturate(1.05);transform:scale(1.01);transition:filter 520ms var(--fadeEase), transform 520ms var(--fadeEase)}
+
+    :root[data-theme="white"]{ --themeHue: rgba(255,255,255,.55); --themeHueOpacity: .20; --glassA: rgba(255,255,255,.34); --glassB: rgba(255,255,255,.14); --glassBorder: rgba(255,255,255,.40); --glassBorderOn: rgba(255,255,255,.78); --glassGlow: rgba(255,255,255,.28); }
+    :root[data-theme="grey"]{ --themeHue: rgba(200,210,225,.55); --themeHueOpacity: .28; --glassA: rgba(255,255,255,.22); --glassB: rgba(255,255,255,.09); --glassBorder: rgba(255,255,255,.30); --glassBorderOn: rgba(255,255,255,.62); --glassGlow: rgba(255,255,255,.22); }
+    :root[data-theme="black"]{ --themeHue: rgba(0,0,0,.0); --themeHueOpacity: .00; --glassA: rgba(255,255,255,.12); --glassB: rgba(255,255,255,.06); --glassBorder: rgba(255,255,255,.22); --glassBorderOn: rgba(255,255,255,.50); --glassGlow: rgba(255,255,255,.18); }
+    :root[data-theme="blue"]{ --themeHue: rgba(50,140,255,.75); --themeHueOpacity: .33; --glassA: rgba(45,140,255,.30); --glassB: rgba(45,140,255,.12); --glassBorder: rgba(120,190,255,.40); --glassBorderOn: rgba(190,230,255,.78); --glassGlow: rgba(120,190,255,.30); }
+    :root[data-theme="red"]{ --themeHue: rgba(255,70,100,.75); --themeHueOpacity: .32; --glassA: rgba(255,70,100,.28); --glassB: rgba(255,70,100,.11); --glassBorder: rgba(255,170,185,.36); --glassBorderOn: rgba(255,220,228,.72); --glassGlow: rgba(255,130,150,.30); }
+    :root[data-theme="purple"]{ --themeHue: rgba(140,90,255,.78); --themeHueOpacity: .33; --glassA: rgba(140,90,255,.30); --glassB: rgba(140,90,255,.12); --glassBorder: rgba(205,175,255,.38); --glassBorderOn: rgba(235,220,255,.76); --glassGlow: rgba(205,175,255,.30); }
+    :root[data-theme="green"]{ --themeHue: rgba(40,230,170,.75); --themeHueOpacity: .30; --glassA: rgba(40,230,170,.26); --glassB: rgba(40,230,170,.10); --glassBorder: rgba(170,255,225,.34); --glassBorderOn: rgba(220,255,240,.70); --glassGlow: rgba(140,255,210,.28); }
+    :root[data-theme="yellow"]{ --themeHue: rgba(255,210,70,.78); --themeHueOpacity: .30; --glassA: rgba(255,210,70,.26); --glassB: rgba(255,210,70,.10); --glassBorder: rgba(255,240,190,.34); --glassBorderOn: rgba(255,250,224,.70); --glassGlow: rgba(255,235,170,.28); }
+
+    @media (max-width: 1200px){ .gridDepartments{grid-template-columns:repeat(4,minmax(0,1fr));} }
+    @media (max-width: 980px){
+      .gridDepartments{grid-template-columns:repeat(2,minmax(0,1fr));}
+      .childModalGrid{grid-template-columns:repeat(2,minmax(0,1fr));}
+      .topbar{position:static;justify-content:flex-end;padding:18px var(--safeX) 0}
+      .scrollNav{right:var(--safeX); left:var(--safeX); transform:none; justify-content:center}
+      main{padding-top:140px}
+      .lukeCredit{position:static;padding:0 var(--safeX) 20px;text-align:right}
+    }
+    @media (max-width: 640px){
+      .sectionNav{gap:14px}
+      .childModalGrid{grid-template-columns:1fr}
+      .childModalTitle{font-size:24px}
+      .tile{width:90px;height:90px;border-radius:22px}
+      .tile svg{width:40px;height:40px}
+      .tile-label{font-size:15px}
+      .welcomeForm{flex-direction:column}
+      .welcomeInput,.welcomeBtn{width:100%}
+    }
+  #home{transform:none;transform-origin:top center;margin-bottom:0;}
+    #home .homeEmbedScale{zoom:0.8; width:100%; max-width:1400px; margin:0 auto; transform-origin:top center; display:flex; flex-direction:column; align-items:center;}
+    #home .userGreeting,
+    #home .sectionHead,
+    #home .homeCards,
+    #home .socialBlock{margin-left:auto; margin-right:auto; width:100%;}
+    #home .sectionHead{max-width:1000px;}
+    #home .homeCards{max-width:1150px;}
+    #home .socialBlock{max-width:900px;}
+
+.toolExternal{
+  position:absolute;
+  top:-6px;
+  right:-6px;
+  background:rgba(0,0,0,.6);
+  border:1px solid rgba(255,255,255,.35);
+  border-radius:999px;
+  width:22px;
+  height:22px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:12px;
+  font-weight:700;
+  color:white;
+}
+
+
+.topSocial{
+  position:fixed;
+  top:18px;
+  left:var(--safeX);
+  z-index:1100;
+  display:flex;
+  gap:14px;
+}
+.topSocial a{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:42px;
+  height:42px;
+  border-radius:999px;
+  background:rgba(12,16,24,.32);
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 14px 28px rgba(0,0,0,.35);
+  transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+.topSocial a:hover{
+  transform:translateY(-2px) scale(1.02);
+  border-color:rgba(255,255,255,.22);
+  box-shadow:0 0 0 1px rgba(255,255,255,.16), 0 18px 40px rgba(0,0,0,.42), 0 0 18px rgba(255,255,255,.22);
+}
+.topSocial img{
+  width:26px;
+  height:26px;
+}
+
+    
+
+
+    /* Responsive fixes added for SharePoint, tablets, and phones */
+    html{
+      width:100%;
+      max-width:100%;
+      overflow-x:hidden;
+      -webkit-text-size-adjust:100%;
+      text-size-adjust:100%;
+    }
+    body{
+      width:100%;
+      max-width:100%;
+      min-height:100vh;
+      min-height:100dvh;
+      overflow:hidden;
+    }
+    .portal-shell{
+      min-height:100vh;
+      height:100vh;
+      min-height:100dvh;
+      height:100dvh;
+      max-width:100%;
+    }
+    img, svg{
+      max-width:100%;
+    }
+    button, input, a{
+      -webkit-tap-highlight-color:transparent;
+    }
+    .section,
+    .sectionHead,
+    .homeCards,
+    .gridDepartments,
+    .gridResources,
+    .gridTools{
+      max-width:100%;
+    }
+    .sectionNav{
+      width:100%;
+      max-width:100%;
+    }
+    .deptTile,
+    .resourceCard,
+    .guideCard,
+    .childModalCard{
+      min-width:0;
+    }
+    .deptTitle,
+    .tile-label,
+    .toolLabel,
+    .childModalLinkLabel{
+      overflow-wrap:anywhere;
+      word-break:normal;
+    }
+    .scrollNav{
+      max-width:calc(100vw - (var(--safeX) * 2));
+    }
+
+    @media (max-width: 1200px){
+      :root{ --safeX:clamp(16px, 3vw, 34px); --sectionGap:clamp(26px, 4vw, 54px); }
+      .gridDepartments{grid-template-columns:repeat(3,minmax(0,1fr));}
+      .resourceCard{height:clamp(180px, 24vw, 220px);}
+    }
+
+    @media (max-width: 980px){
+      :root{ --safeX:clamp(14px, 4vw, 28px); }
+      .topSocial{
+        position:static;
+        justify-content:center;
+        flex-wrap:wrap;
+        padding:16px var(--safeX) 0;
+      }
+      .topbar{
+        position:static;
+        justify-content:center;
+        padding:12px var(--safeX) 0;
+      }
+      .themeMenu{
+        left:50%;
+        right:auto;
+        transform:translateX(-50%);
+        flex-wrap:wrap;
+        width:min(320px, calc(100vw - 32px));
+        justify-content:center;
+      }
+      main{
+        padding:22px var(--safeX) 64px;
+      }
+      .section{
+        padding:22px 0 34px;
+        gap:22px;
+      }
+      .section + .section{
+        margin-top:clamp(24px, 5vw, 42px);
+      }
+      .sectionNav{
+        gap:14px;
+      }
+      .gridDepartments{
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:14px;
+      }
+      .gridResources{
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:14px;
+        width:100%;
+      }
+      .gridTools{
+        grid-template-columns:repeat(auto-fit,minmax(96px,124px));
+        gap:34px 16px;
+        padding-bottom:30px;
+      }
+      .deptTile{
+        padding:14px;
+      }
+      .deptTile .deptTitle,
+      .resourceCard .deptTitle{
+        font-size:clamp(15px, 2.6vw, 18px);
+      }
+      .childModal{
+        align-items:flex-start;
+        overflow-y:auto;
+        padding:18px;
+      }
+      .childModalCard{
+        margin:8px auto 24px;
+        max-height:none;
+      }
+      .lukeCredit{
+        position:static;
+        width:auto;
+        margin:0;
+        padding:0 var(--safeX) 20px;
+        text-align:center;
+      }
+    }
+
+    @media (max-width: 700px){
+      .homeCards{
+        grid-template-columns:1fr;
+      }
+      .gridDepartments,
+      .gridResources{
+        grid-template-columns:1fr;
+      }
+      .resourceCard{
+        height:clamp(170px, 48vw, 220px);
+      }
+      .childModalGrid,
+      .childModalGrid.hasImages{
+        grid-template-columns:1fr;
+      }
+    }
+
+    @media (max-width: 640px){
+      :root{ --safeX:16px; --sectionGap:24px; }
+      .topSocial{
+        gap:10px;
+        padding-top:12px;
+      }
+      .topSocial a{
+        width:38px;
+        height:38px;
+      }
+      .topSocial img{
+        width:23px;
+        height:23px;
+      }
+      .themeBtn{
+        height:38px;
+        padding:0 13px;
+      }
+      main{
+        padding:18px var(--safeX) 56px;
+      }
+      .section{
+        padding:18px 0 28px;
+        gap:18px;
+      }
+      .sectionNav{
+        display:grid;
+        grid-template-columns:repeat(4,minmax(0,1fr));
+        gap:10px;
+        align-items:start;
+      }
+      .tilewrap{
+        width:100%;
+      }
+      .tile{
+        width:min(74px, 18vw);
+        height:min(74px, 18vw);
+        min-width:62px;
+        min-height:62px;
+        border-radius:20px;
+      }
+      .tile svg{
+        width:34px;
+        height:34px;
+      }
+      .tile-label{
+        margin-top:8px;
+        font-size:12px;
+        line-height:1.15;
+      }
+      .title{
+        font-size:clamp(28px, 9vw, 38px);
+        line-height:1.08;
+      }
+      .lead{
+        font-size:14px;
+        line-height:1.5;
+      }
+      .userGreeting{
+        font-size:clamp(18px, 5vw, 24px) !important;
+      }
+      .guideCard{
+        padding:14px;
+      }
+      .guideCard .t{
+        font-size:16px;
+      }
+      .guideCard .d{
+        font-size:13px;
+      }
+      .deptTile{
+        aspect-ratio:16/10;
+        min-height:150px;
+        padding:14px;
+      }
+      .resourceCard{
+        min-height:165px;
+      }
+      .gridTools{
+        grid-template-columns:repeat(3,minmax(80px,1fr));
+        gap:38px 12px;
+        width:100%;
+      }
+      .toolCircle{
+        width:min(96px, 26vw);
+        margin:0 auto;
+      }
+      .toolLabel{
+        width:110px;
+        font-size:12px;
+        top:calc(100% + 8px);
+      }
+      .toolExternal{
+        top:-4px;
+        right:-4px;
+      }
+      .childModal{
+        padding:12px;
+      }
+      .childModalCard{
+        width:100%;
+        border-radius:22px;
+        padding:16px;
+      }
+      .childModalTop{
+        gap:10px;
+      }
+      .childModalTitle{
+        font-size:22px;
+      }
+      .childModalSub{
+        font-size:13px;
+      }
+      .childModalClose{
+        width:38px;
+        height:38px;
+        flex:0 0 auto;
+      }
+      .childModalLink{
+        min-height:92px;
+        font-size:16px;
+      }
+      .childModalLink.hasImage{
+        min-height:145px;
+      }
+      .welcomeCard{
+        padding:18px;
+      }
+      .welcomeTitle{
+        font-size:28px;
+      }
+      .welcomeSub{
+        font-size:13px;
+      }
+    }
+
+    @media (max-width: 420px){
+      :root{ --safeX:12px; }
+      .sectionNav{
+        gap:8px;
+      }
+      .tile{
+        width:min(68px, 19vw);
+        height:min(68px, 19vw);
+        min-width:56px;
+        min-height:56px;
+        border-radius:18px;
+      }
+      .tile svg{
+        width:30px;
+        height:30px;
+      }
+      .tile-label{
+        font-size:11px;
+      }
+      .deptTile{
+        min-height:138px;
+      }
+      .gridTools{
+        grid-template-columns:repeat(2,minmax(92px,1fr));
+        gap:40px 14px;
+      }
+      .toolCircle{
+        width:92px;
+      }
+    }
+
+    @media (orientation: landscape) and (max-height: 520px){
+      .section{
+        min-height:auto;
+        padding-top:16px;
+        padding-bottom:22px;
+      }
+      .childModal{
+        align-items:flex-start;
+      }
+      .welcomeOverlay{
+        align-items:flex-start;
+        overflow-y:auto;
+      }
+      .welcomeCard{
+        margin-top:16px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce){
+      *{
+        animation:none !important;
+        transition:none !important;
+        scroll-behavior:auto !important;
+      }
+    }
+
+
+    .bg-layer{
+      will-change: opacity, transform;
+      backface-visibility: hidden;
+      transform:none;
+    }
+    .tile, .deptTile, .toolCircle, .topSocial a, .themeBtn, .themeMenu, .childModalCard{
+      will-change: transform, opacity;
+      backface-visibility: hidden;
+      transform: translateZ(0);
+    }
+    .deptImg{
+      will-change: transform;
+      backface-visibility: hidden;
+      transform: translateZ(0) scale(1.01);
+    }
+    .portal-shell{
+      overscroll-behavior: contain;
+    }
+
+</style>
+</head>
+<body>
+  <div class="portal-shell" id="portal">
+
+<div class="topSocial">
+  <a href="https://instagram.com/thestingraygroup/" target="_blank">
+    <img src="https://cdn-icons-png.flaticon.com/512/2111/2111463.png">
+  </a>
+  <a href="https://www.facebook.com/TheStingrayGroup" target="_blank">
+    <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png">
+  </a>
+  <a href="https://www.youtube.com/@thestingraygroup" target="_blank">
+    <img src="https://cdn-icons-png.flaticon.com/512/1384/1384060.png">
+  </a>
+</div>
+
+  <div class="bg" aria-hidden="true"></div>
+  <div id="bgLayer1" class="bg-layer active" aria-hidden="true"></div>
+  <div id="bgLayer2" class="bg-layer" aria-hidden="true"></div>
+  <div class="themeHue" id="themeHue" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
+
+  
+
+  <div class="topbar">
+    <div class="themeWrap">
+      <button class="themeBtn" id="themeBtn" type="button" aria-haspopup="true" aria-expanded="false">Theme</button>
+      <div class="themeMenu" id="themeMenu" role="menu" aria-label="Theme menu">
+        <button class="themeSwatch" data-theme="white"  role="menuitem" type="button" aria-label="White theme"  title="White"></button>
+        <button class="themeSwatch" data-theme="grey"   role="menuitem" type="button" aria-label="Grey theme"   title="Grey"></button>
+        <button class="themeSwatch" data-theme="black"  role="menuitem" type="button" aria-label="Black theme"  title="Black"></button>
+        <button class="themeSwatch" data-theme="blue"   role="menuitem" type="button" aria-label="Blue theme"   title="Blue"></button>
+        <button class="themeSwatch" data-theme="red"    role="menuitem" type="button" aria-label="Red theme"    title="Red"></button>
+        <button class="themeSwatch" data-theme="purple" role="menuitem" type="button" aria-label="Purple theme" title="Purple"></button>
+        <button class="themeSwatch" data-theme="green"  role="menuitem" type="button" aria-label="Green theme"  title="Green"></button>
+        <button class="themeSwatch" data-theme="yellow" role="menuitem" type="button" aria-label="Yellow theme" title="Yellow"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="welcomeOverlay" id="welcomeOverlay" aria-hidden="true">
+    <div class="welcomeCard" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+      <div class="welcomeTitle" id="welcomeTitle">Welcome</div>
+      <div class="welcomeSub">Set your name once — you can change it anytime.</div>
+      <div class="welcomeForm">
+        <input class="welcomeInput" id="nameInput" type="text" inputmode="text" autocomplete="name" placeholder="Your name" maxlength="32" />
+        <button class="welcomeBtn" id="saveName" type="button">Enter</button>
+      </div>
+    </div>
+  </div>
+
+  <main id="main"></main>
+  <div class="lukeCredit">Designed by Luke Vella</div>
+
+  <div class="childModal" id="childModal" aria-hidden="true">
+    <div class="childModalCard">
+      <div class="childModalTop">
+        <div>
+          <div class="childModalTitle" id="childModalTitle">Department</div>
+          <div class="childModalSub">Choose a section to open.</div>
+        </div>
+        <button class="childModalClose" id="childModalClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="childModalGrid" id="childModalGrid"></div>
+    </div>
+  </div>
+
+  <script>
+    const mainTiles = [
+      { key:'home', label:'Home', target:'home', icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 13.5V6.8A2.8 2.8 0 0 1 6.8 4h10.4A2.8 2.8 0 0 1 20 6.8v10.4A2.8 2.8 0 0 1 17.2 20H10.5"></path><path d="M4 17h6"></path><path d="M4 20h4"></path><path d="M13 8h4"></path><path d="M13 11h4"></path></svg>` },
+      { key:'departments', label:'Departments', target:'departments', icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V7l8-4Z"></path><path d="M9 12h6"></path><path d="M12 9v6"></path></svg>` },
+      { key:'msadmin', label:'Company Resources', target:'company-resources', icon:`<svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="7" height="7" rx="2"></rect><rect x="13" y="4" width="7" height="7" rx="2"></rect><rect x="4" y="13" width="7" height="7" rx="2"></rect><rect x="13" y="13" width="7" height="7" rx="2"></rect></svg>` },
+      { key:'tools', label:'Tools', target:'tools', icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a5 5 0 0 0-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 0 0 6.4-6.4l-3 3-2.5-2.5 2.5-2.5-3-3Z"></path></svg>` }
+    ];
+
+    const departments = [
+      { title: 'IT Department', img: 'https://stingraymanufacturers.github.io/departmenttiles/it-hover.webp', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/IT-Department-Hub.aspx', pos: 'center 8%' },
+      { title: 'Executives', img: 'https://stingraymanufacturers.github.io/departmenttiles/executive1.webp', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Executives-Hub.aspx' },
+      { title: 'Admin Department', img: 'https://stingraymanufacturers.github.io/departmenttiles/admin.webp', href: '#', children: [
+        { title: 'Internal Sales', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Admin-Department-Hub.aspx' },
+        { title: 'Debtors', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Debtors-Department-Hub.aspx' },
+        { title: 'JHB Admin', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Admin-Department-Hub-JHB.aspx' }
+      ]},
+      { title: 'Service Department', img: 'https://stingraymanufacturers.github.io/departmenttiles/service.webp', href: '#', children: [
+        { title: 'Cape Town', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Cpt-Service-Department-Hub.aspx' },
+        { title: 'Johannesburg', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/JHB-Service-Department-Hub.aspx' }
+      ]},
+      { title: 'Planning Department', img: 'https://stingraymanufacturers.github.io/departmenttiles/planning.webp', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Planning-Department-Hub.aspx' },
+      { title: 'Art Department', img: 'https://stingraymanufacturers.github.io/departmenttiles/art.webp', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Art-Department-Hub.aspx' },
+      { title: 'Shipping Department', img: 'https://stingraymanufacturers.github.io/departmenttiles/shipping.webp', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Shipping-Department-Hub.aspx' },
+      { title: 'E-com Department', img: 'https://stingraymanufacturers.github.io/departmenttiles/e-com.webp', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/E-com-Department-Hub.aspx' },
+      { title: 'Human Resources', img: 'https://stingraymanufacturers.github.io/departmenttiles/admin-hover.webp', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Human-Resources-Hub.aspx' },
+      { title: 'Finance Department', img: 'https://stingraymanufacturers.github.io/departmenttiles/shipping-hover.webp', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Finance-Department-Hub.aspx' },
+      { title: 'Quality Control', img: 'https://stingraymanufacturers.github.io/departmenttiles/quality.webp', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Quality-Control-Hub.aspx' },
+      { title: 'Warehouse', img: 'https://stingraymanufacturers.github.io/departmenttiles/warehouse.webp', href: '#', children: [
+        { title: 'Production', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Production-Department-Hub.aspx', img: 'https://stingraymanufacturers.github.io/departmenttiles/production.webp' },
+        { title: 'Dispatch', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Invoicing-Hub.aspx', img: 'https://stingraymanufacturers.github.io/departmenttiles/dispatch.webp' },
+        { title: 'Receiving', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Receiving-Department-Hub.aspx', img: 'https://stingraymanufacturers.github.io/departmenttiles/receiving.webp' },
+        { title: 'Finished Goods', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/FG-Stores-Hub.aspx', img: 'https://stingraymanufacturers.github.io/departmenttiles/finishedgoods.webp' },
+        { title: 'Heater Assembly', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Heater-Assembly-Hub.aspx', img: 'https://stingraymanufacturers.github.io/departmenttiles/heaterassembly.webp' }
+      ]},
+      { title: 'Training', img: 'https://stingraymanufacturers.github.io/departmenttiles/training.webp', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/Training%20Library/Forms/AllItems.aspx?npsAction=createList' },
+      { title: 'Operations', img: 'https://stingraymanufacturers.github.io/departmenttiles/training-hover.webp', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Operations-Hub.aspx' },
+      { title: 'KAMs and Sales Reps', img: 'https://stingraymanufacturers.github.io/departmenttiles/e-com-hover.webp', href: '#', children: [
+        { title: 'KAMs', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/KAMs-Hub.aspx' },
+        { title: 'Sales Reps', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Sales-Reps-Hub.aspx' }
+      ] }
+    ];
+
+    const resources = [
+      { title: 'Monthly Internal Survey', href: 'https://forms.office.com/Pages/ResponsePage.aspx?id=4f1Q5XaOhUaNPfSBiQrmoKuyg7A1G-NPsxufmAAgc1lUOUM1NlpJQTdWU0o2UTQ0UTBKWVlLVzdXVi4u', img: 'https://stingraymanufacturers.github.io/departmenttiles/internalsurvey.webp', newTab: true },
+      { title: 'Employee of the Month', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Employee-of-the-month.aspx', img: 'https://stingraymanufacturers.github.io/departmenttiles/webemployeeofthemonth.webp' },
+      { title: 'Monthly Newsletter', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/Monthly%20Newsletter/Forms/AllItems.aspx', img: 'https://stingraymanufacturers.github.io/departmenttiles/webmonthlynewsletter.webp' },
+      { title: 'HR Forms', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/HR%20Forms/Forms/AllItems.aspx', img: 'https://stingraymanufacturers.github.io/departmenttiles/webhrforms.webp' },
+      { title: 'ISO 9001 QMS Documents', href: 'https://stingrayacc.sharepoint.com/sites/ISO9001QMS/Shared%20Documents/Forms/AllItems.aspx', img: 'https://stingraymanufacturers.github.io/departmenttiles/webisodocs.webp' },
+      { title: 'Team Updates & Announcements', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/SitePages/Team-Updates-&-Announcements.aspx#marlene-has-relocated-to-cape-town', img: 'https://stingraymanufacturers.github.io/departmenttiles/teamupdatesandannouncements.webp' },
+      { title: 'Monthly Staff Meetings', href: 'https://stingrayacc.sharepoint.com/sites/StingrayIntranet/Monthly%20Staff%20Meetings/Forms/AllItems.aspx?viewid=3ced6e03%2Dee05%2D49d1%2Dbf5f%2D9c77dd3039de&npsAction=createList', img: 'https://stingraymanufacturers.github.io/departmenttiles/monthlystaffmeeting.webp', isNewKey: 'monthlyStaffMeetings' }
+    ];
+
+    const tools = [
+      { title: 'Teams', href: 'msteams:/', img: 'https://stingraymanufacturers.github.io/departmenttiles/teams.webp' },
+      { title: 'Copilot', href: 'https://m365.cloud.microsoft/chat/?auth=2&home=1&fromcode=cmm6e0ny53n', img: 'https://stingraymanufacturers.github.io/departmenttiles/copilot.webp' },
+      { title: 'OpenVPN', href: 'openvpn://', img: 'https://stingraymanufacturers.github.io/departmenttiles/openvpn.webp' },
+      { title: 'Remote SAP', href: 'https://remote.stingray.co.za:8100/dispatcher/', img: 'https://stingraymanufacturers.github.io/departmenttiles/remotesap.webp' },
+      { title: 'SharePoint', href: 'https://stingrayacc.sharepoint.com/_layouts/15/sharepoint.aspx', img: 'https://stingraymanufacturers.github.io/departmenttiles/sharepoint.webp' }
+    ];
+
+    const BG_BY_SECTION = {
+      home: 'https://stingraymanufacturers.github.io/departmenttiles/home.webp',
+      departments: 'https://stingraymanufacturers.github.io/departmenttiles/departments.webp',
+      'company-resources': 'https://stingraymanufacturers.github.io/departmenttiles/companyresources.webp',
+      tools: 'https://stingraymanufacturers.github.io/departmenttiles/newtools.webp'
+    };
+
+    const bgL1 = document.getElementById('bgLayer1');
+    const bgL2 = document.getElementById('bgLayer2');
+    let activeLayer = 1;
+    const preloaded = new Map();
+    function preload(url){
+      if(!url || preloaded.has(url)) return preloaded.get(url);
+      const p = new Promise((resolve)=>{
+        const img = new Image();
+        img.decoding = 'async';
+        img.fetchPriority = 'high';
+        img.onload = async ()=>{
+          try{ if(img.decode) await img.decode(); }catch(e){}
+          resolve(url);
+        };
+        img.onerror = ()=>resolve(url);
+        img.src = url;
+      });
+      preloaded.set(url,p); return p;
+    }
+    Object.values(BG_BY_SECTION).forEach(preload);
+    let bgSwapToken = 0;
+    let bgSwitchTimer = null;
+    let currentBgSection = null;
+    async function setBg(sectionId){
+      if(!sectionId || sectionId === currentBgSection) return;
+      currentBgSection = sectionId;
+      if(bgSwitchTimer) clearTimeout(bgSwitchTimer);
+      bgSwitchTimer = setTimeout(async () => {
+        const url = BG_BY_SECTION[sectionId];
+        if(!url) return;
+        const token = ++bgSwapToken;
+        await preload(url);
+        if(token !== bgSwapToken) return;
+        const incoming = activeLayer === 1 ? bgL2 : bgL1;
+        const outgoing = activeLayer === 1 ? bgL1 : bgL2;
+        incoming.style.backgroundImage = `url("${url}")`;
+        incoming.classList.add('active');
+        outgoing.classList.remove('active');
+        activeLayer = activeLayer === 1 ? 2 : 1;
+      }, 24);
+    }
+
+    function sectionNav(currentId){
+      return `
+        <div class="sectionNav">
+          ${mainTiles.map(tile => `
+            <div class="tilewrap">
+              <button class="tile ${tile.target === currentId ? 'is-current' : ''}" type="button" data-target="${tile.target}" aria-label="Go to ${tile.label}">
+                ${tile.icon}
+              </button>
+              <div class="tile-label">${tile.label}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderDepartmentCard(item){
+      const hasChildren = Array.isArray(item.children) && item.children.length;
+      return `
+        <a class="subtile deptTile ${hasChildren ? 'hasChildren' : ''}" href="${hasChildren ? '#' : (item.href || '#')}" ${!hasChildren && item.href && item.href !== '#' ? 'target="_parent" rel="noopener noreferrer"' : ''} ${hasChildren ? `data-children='${JSON.stringify(item.children).replace(/'/g, '&apos;')}' data-title="${item.title}"` : ''}>
+          <img class="deptImg" src="${item.img}" alt="${item.title}" ${item.pos ? `style="object-position:${item.pos};"` : ''} />
+          <div class="deptTitle">${item.title}</div>
+        </a>
+      `;
+    }
+
+    const NEW_BANNER_HOURS = 24;
+    function shouldShowNewBanner(storageKey){
+      try{
+        const key = `intranetBannerSeen_${storageKey}`;
+        const now = Date.now();
+        const saved = parseInt(localStorage.getItem(key) || '', 10);
+        if(!saved || Number.isNaN(saved)){
+          localStorage.setItem(key, String(now));
+          return true;
+        }
+        return (now - saved) < (NEW_BANNER_HOURS * 60 * 60 * 1000);
+      }catch(err){
+        return true;
+      }
+    }
+
+    function renderResourceCard(item){
+      const isNew = item.isNewKey && shouldShowNewBanner(item.isNewKey);
+      return `
+        <a class="subtile deptTile resourceCard ${isNew ? 'is-new' : ''}" href="${item.href}" target="${item.newTab ? '_blank' : '_parent'}" rel="noopener noreferrer">
+          ${isNew ? '<div class="newBanner">New</div>' : ''}
+          <img class="deptImg" src="${item.img}" alt="${item.title}" />
+          <div class="deptTitle">${item.title}</div>
+        </a>
+      `;
+    }
+
+    function renderToolCard(item){
+      return `
+        <a class="subtile toolCircle" href="${item.href}" style="background-image:url('${item.img}')" target="_blank" rel="noopener noreferrer">
+          ${["Teams","Copilot","OpenVPN","Remote SAP","SharePoint"].includes(item.title) ? '<div class="toolExternal">↗</div>' : ''}
+          <div class="toolLabel">${item.title}</div>
+        </a>
+      `;
+    }
+
+    const main = document.getElementById('main');
+    main.innerHTML = `
+      <section class="section" id="home" data-section="home">
+        ${sectionNav('home')}
+
+        <div class="sectionHead">
+          <h1 class="title">Welcome to the Stingray Intranet</h1>
+          <div class="userGreeting" style="text-align:center;margin-top:8px;margin-bottom:14px;font-size:28px;font-weight:600;opacity:.9;">
+            <span id="timeGreeting"></span>, <span id="username">User</span> <span id="editName" class="editName" title="Change name">⚙</span>
+          </div>
+          <div class="eyebrow">Stingray Intranet</div>
+          <p class="lead">This is your one page quick-launch hub for everything inside Stingray. Scroll straight through Home, Departments, Company Resources, and Tools, or use the tiles above any section to jump exactly where you need to go.</p>
+        </div>
+
+        <div class="homeCards">
+          <div class="guideCard"><div class="t">Departments</div><div class="d">Open each department hub to find team info, key contacts, processes, and the latest updates for that area of the business.</div></div>
+          <div class="guideCard"><div class="t">Company Resources</div><div class="d">Quick access to shared resources like HR forms, monthly newsletters, Employee of the Month content, and ISO documents.</div></div>
+          <div class="guideCard"><div class="t">Tools</div><div class="d">Launch the core apps you use every day like Teams, Copilot, OpenVPN, Remote SAP, and SharePoint from one place.</div></div>
+        </div>
+        </section>
+
+      <section class="section" id="departments" data-section="departments">
+        ${sectionNav('departments')}
+        <div class="sectionHead">
+          <div class="eyebrow">Section 2</div>
+          <h2 class="title">Departments</h2>
+          <p class="lead">Every department tile sits on the page at once, so you can scan and launch directly without changing views.</p>
+        </div>
+        <div class="gridDepartments">
+          ${departments.map(renderDepartmentCard).join('')}
+        </div>
+      </section>
+
+      <section class="section" id="company-resources" data-section="company-resources">
+        ${sectionNav('company-resources')}
+        <div class="sectionHead">
+          <div class="eyebrow">Section 3</div>
+          <h2 class="title">Company Resources</h2>
+          <p class="lead">Shared company documents and recurring internal resources live together here for quicker access.</p>
+        </div>
+        <div class="gridResources">
+          ${resources.map(renderResourceCard).join('')}
+        </div>
+      </section>
+
+      <section class="section" id="tools" data-section="tools">
+        ${sectionNav('tools')}
+        <div class="sectionHead">
+          <div class="eyebrow">Section 4</div>
+          <h2 class="title">Tools</h2>
+          <p class="lead">Your everyday apps stay in the last section, with the same four navigation tiles repeated above so you can jump back anywhere instantly.</p>
+        </div>
+        <div class="gridTools">
+          ${tools.map(renderToolCard).join('')}
+        </div>
+      </section>
+    `;
+    let scrollAnimFrame = null;
+    function scrollToSection(id){
+      const el = document.getElementById(id);
+      const portal = document.getElementById('portal');
+      if(!el || !portal) return;
+      if(scrollAnimFrame){
+        cancelAnimationFrame(scrollAnimFrame);
+        scrollAnimFrame = null;
+      }
+      const portalTop = portal.getBoundingClientRect().top;
+      const targetTop = el.getBoundingClientRect().top;
+      const offset = (targetTop - portalTop) + portal.scrollTop - 18;
+      scrollAnimFrame = requestAnimationFrame(() => {
+        portal.scrollTo({ top: offset, behavior:'smooth' });
+        scrollAnimFrame = null;
+      });
+    }
+
+    const childModal = document.getElementById('childModal');
+    const childModalTitle = document.getElementById('childModalTitle');
+    const childModalGrid = document.getElementById('childModalGrid');
+    const childModalClose = document.getElementById('childModalClose');
+
+    function openChildModal(title, items){
+      childModalTitle.textContent = title;
+      const hasImages = items.some(ch => ch.img);
+      childModalGrid.classList.toggle('hasImages', hasImages);
+      childModalGrid.innerHTML = items.map(ch => ch.img
+        ? `<a class="childModalLink hasImage" href="${ch.href}" target="_parent" rel="noopener noreferrer"><img class="childModalLinkImg" src="${ch.img}" alt="${ch.title}"><div class="childModalLinkLabel">${ch.title}</div></a>`
+        : `<a class="childModalLink" href="${ch.href}" target="_parent" rel="noopener noreferrer">${ch.title}</a>`
+      ).join('');
+      childModal.classList.add('open');
+      childModal.setAttribute('aria-hidden','false');
+    }
+    function closeChildModal(){
+      childModal.classList.remove('open');
+      childModal.setAttribute('aria-hidden','true');
+      childModalGrid.classList.remove('hasImages');
+    }
+
+    document.addEventListener('click', (e)=>{
+      const navBtn = e.target.closest('[data-target]');
+      if(navBtn){
+        e.preventDefault();
+        scrollToSection(navBtn.getAttribute('data-target'));
+        return;
+      }
+      const deptWithChildren = e.target.closest('.deptTile.hasChildren');
+      if(deptWithChildren){
+        e.preventDefault();
+        const title = deptWithChildren.getAttribute('data-title') || 'Department';
+        const items = JSON.parse((deptWithChildren.getAttribute('data-children') || '[]').replace(/&apos;/g, "'"));
+        openChildModal(title, items);
+        return;
+      }
+      if(e.target === childModal || e.target === childModalClose){
+        closeChildModal();
+        return;
+      }
+      const link = e.target.closest('a[href^="openvpn://"], a[href^="msteams:/"]');
+      if(link){
+        e.preventDefault();
+        window.location.href = link.getAttribute('href');
+      }
+    });
+    document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeChildModal(); });
+
+    const sectionEls = Array.from(document.querySelectorAll('.section'));
+    const scrollNavBtns = Array.from(document.querySelectorAll('.scrollNavBtn'));
+    const sectionTileButtons = Array.from(document.querySelectorAll('.sectionNav .tile'));
+    const portal = document.getElementById('portal');
+
+    let lastActiveId = null;
+    function setActiveNav(id){
+      if(id === lastActiveId) return;
+      lastActiveId = id;
+      scrollNavBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.target === id));
+      sectionTileButtons.forEach(btn => btn.classList.toggle('is-current', btn.dataset.target === id));
+      setBg(id);
+    }
+
+    function detectActiveSection(){
+      if(!portal || !sectionEls.length) return;
+      const portalRect = portal.getBoundingClientRect();
+      const probeY = portalRect.top + Math.max(110, portal.clientHeight * 0.42);
+      let activeId = sectionEls[0].id;
+      let bestDistance = Infinity;
+
+      sectionEls.forEach(section => {
+        const rect = section.getBoundingClientRect();
+        const distance = Math.abs(rect.top - probeY);
+        if(distance < bestDistance){
+          bestDistance = distance;
+          activeId = section.id;
+        }
+      });
+
+      const currentSection = document.getElementById(lastActiveId || activeId);
+      if(currentSection && lastActiveId && lastActiveId !== activeId){
+        const currentDistance = Math.abs(currentSection.getBoundingClientRect().top - probeY);
+        if(currentDistance <= bestDistance + 90){
+          activeId = lastActiveId;
+        }
+      }
+
+      setActiveNav(activeId);
+    }
+
+    let sectionTick = null;
+    function onPortalScroll(){
+      if(sectionTick) return;
+      sectionTick = requestAnimationFrame(() => {
+        detectActiveSection();
+        sectionTick = null;
+      });
+    }
+
+    if(portal){
+      portal.addEventListener('scroll', onPortalScroll, { passive:true });
+      window.addEventListener('resize', detectActiveSection, { passive:true });
+    }
+
+    detectActiveSection();
+
+    const themeBtn = document.getElementById('themeBtn');
+    const themeMenu = document.getElementById('themeMenu');
+    function setTheme(t){ document.documentElement.setAttribute('data-theme', t); localStorage.setItem('intranetTheme', t); }
+    setTheme(localStorage.getItem('intranetTheme') || 'black');
+    themeBtn.addEventListener('click', ()=>{
+      const open = themeMenu.classList.toggle('open');
+      themeBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    document.querySelectorAll('.themeSwatch').forEach(btn => btn.addEventListener('click', ()=>{ setTheme(btn.dataset.theme); themeMenu.classList.remove('open'); themeBtn.setAttribute('aria-expanded', 'false'); }));
+    document.addEventListener('click', (e)=>{ if(!themeMenu.contains(e.target) && e.target !== themeBtn) { themeMenu.classList.remove('open'); themeBtn.setAttribute('aria-expanded', 'false'); } });
+
+    const welcomeOverlay = document.getElementById('welcomeOverlay');
+    const nameInput = document.getElementById('nameInput');
+    const saveName = document.getElementById('saveName');
+    const username = document.getElementById('username');
+    const editName = document.getElementById('editName');
+
+    function applyName(name){
+      const clean = (name || '').trim() || 'User';
+      username.textContent = clean;
+      localStorage.setItem('intranetUserName', clean);
+    }
+    function openWelcome(prefill=''){
+      document.body.classList.add('hasWelcome');
+      welcomeOverlay.classList.add('show');
+      welcomeOverlay.setAttribute('aria-hidden','false');
+      nameInput.value = prefill;
+      setTimeout(()=> nameInput.focus(), 50);
+    }
+    function closeWelcome(){
+      document.body.classList.remove('hasWelcome');
+      welcomeOverlay.classList.remove('show');
+      welcomeOverlay.setAttribute('aria-hidden','true');
+    }
+    function saveNameNow(){
+      const val = nameInput.value.trim();
+      if(!val) return;
+      applyName(val);
+      closeWelcome();
+    }
+    const savedName = localStorage.getItem('intranetUserName');
+    if(savedName){ applyName(savedName); } else { applyName('User'); openWelcome(''); }
+    saveName.addEventListener('click', saveNameNow);
+    nameInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') saveNameNow(); });
+    editName.addEventListener('click', ()=> openWelcome(localStorage.getItem('intranetUserName') || ''));
+
+    
+    // Background parallax disabled for smoother SharePoint performance.
+    
+    // Dedicated portal scroll container handles SharePoint embed height.
+
+  </script>
+
+<script>
+function setGreeting(){
+  const h = new Date().getHours();
+  let g="Hello";
+  if(h<12) g="Good Morning";
+  else if(h<18) g="Good Afternoon";
+  else g="Good Evening";
+  const el=document.getElementById("timeGreeting");
+  if(el) el.textContent=g;
+}
+setGreeting();
+</script>
+
+  </div>
+</body>
+</html>
